@@ -111,7 +111,7 @@ export const DownloadReport: FC = () => {
 
       autoTable(doc, {
         head:[
-            ['Summary', ''],
+            ['Additional Information', ''],
         ],
         body:[
             ['Subject', data.name],
