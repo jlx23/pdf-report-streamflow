@@ -1,8 +1,7 @@
-import React, { FC, useCallback } from "react";
+import React, { FC, useCallback, useState } from "react";
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { Connection, PublicKey } from "@solana/web3.js";
-import * as borsh from "@project-serum/borsh"
 import {
     StreamClient,
     Stream,
@@ -22,65 +21,57 @@ import {
     getBN,
     getNumberFromBN,
 } from "@streamflow/stream";
-import { TokenListProvider } from "@solana/spl-token-registry";
+
 
 export const DownloadReport: FC = () => {
 
-    const onClick2 = useCallback(async () => {
-        const connection = new Connection("https://api.devnet.solana.com");
-        const address = new PublicKey("6xAYhRfVbYo9yQcGLUtETJ3K1YHYR76fod5a8KNFnR6g");
-        const pda = new PublicKey("Gssm3vfi8s65R31SBdmQRq6cKeYojGgup7whkw4VCiQj")
+    const onClick = useCallback(async (e:any) => {
+      e.preventDefault();
 
-        const info = await connection.getParsedAccountInfo(pda);
-        //console.log(info.value?.data.)
-
-        new TokenListProvider().resolve().then((tokens) => {
-          const tokenList = tokens.getList();
-          console.log(tokenList)
-        })
-
-        
-
-    },[Connection, PublicKey])
-
-    const onClick = useCallback(async () => {
-
-      const streamID = "KQ3zTd817m3TzkpoXuriHZ3ad2hoDu1rvC7Wcc6eUZ8";
+      const streamID = e.target.streamID.value;
       const streamClient = new StreamClient("https://api.devnet.solana.com");
-      const data = await streamClient.getOne(streamID);
-      console.log(data)
-      const currentTimestamp = Math.floor(Date.now()/1000);
-      //var status = 'scheduled' || 'ongoing' || 'completed' || 'cancelled';
-      var status = '';
-      
-      if (currentTimestamp - data.start <= 0) {
-        status = 'Scheduled'
-      }
-      else if (currentTimestamp - data.start > 0 && currentTimestamp - data.cliff < 0) {
-        status = 'Ongoing'
-      }
-      else if (currentTimestamp - data.cliff > 0) {
-        status = 'Completed'
-      }
-      else if (data.canceledAt > 0) {
-        status = 'Cancelled'
+
+      async function getStreamData() {
+        var streamData = {} as Stream
+        try {
+          streamData = await streamClient.getOne(streamID);
+        } catch (e:any) {
+          throw e
+        }
+        return streamData
       }
 
-      const name = data.name.split("\u0000").join("")
-      const sender = data.sender
-      const recipient = data.recipient
+      const data = await getStreamData()
+      
+      const name = data.name.split("\u0000").join("");
+      var status = '';
+      const sender = data.sender;
+      const recipient = data.recipient;
+      const currentTimestamp = Math.floor(Date.now()/1000);
       const depositedAmount = data.depositedAmount / (10**9);
       const unlockedAmount = data.unlocked(currentTimestamp, 0) / 10**9;
       const startTime = new Date(data.start * 1000).toLocaleString();
       const endTime = new Date(data.end * 1000).toLocaleString()
       const streamflowFeeTotal = data.streamflowFeeTotal / 10**9;
       const streamflowFeePercent = streamflowFeeTotal / depositedAmount * 100;
-      const releaseRateSeconds = unlockedAmount / (data.end - data.start)
-      const releaseRateHours = releaseRateSeconds * (60*60)
-      const releaseRateDays = releaseRateHours * 24
-
+      const releaseRateSeconds = depositedAmount / (data.end - data.start);
+      const releaseRateHours = releaseRateSeconds * 60 * 60;
+      const releaseRateDays = releaseRateHours * 24;
       var transferableBy = '';
-      var cancelableBy = ''
+      var cancelableBy = '';
+      
+      if (currentTimestamp - data.start <= 0) {
+        status = 'Scheduled'
+      }
+      else if (currentTimestamp - data.start > 0 && currentTimestamp - data.end < 0) {
+        status = 'Ongoing'
+      }
+      else if (currentTimestamp - data.end > 0) {
+        status = 'Completed'
+      }
+      else if (data.canceledAt > 0) {
+        status = 'Cancelled'
+      }
 
       if (data.transferableBySender && data.transferableByRecipient) {
         transferableBy = 'Sender and Recipient'
@@ -173,9 +164,9 @@ export const DownloadReport: FC = () => {
         body:[
             ['Stream ID', streamID],
             ['Release rate', 
-              releaseRateSeconds + ' token/second' + '\n' +
-              releaseRateHours + ' token/hour' + '\n' +
-              releaseRateDays + ' token/day'
+              releaseRateSeconds.toFixed(6) + ' token/second' + '\n' +
+              releaseRateHours.toFixed(6) + ' token/hour' + '\n' +
+              releaseRateDays.toFixed(6) + ' token/day'
             ],
             ['Transferable by', transferableBy],
             ['Cancelable by', cancelableBy],
@@ -210,10 +201,10 @@ export const DownloadReport: FC = () => {
         didParseCell: (d) => {
           if (d.section == 'body') {
             if (d.column.index === 0) {
-              d.cell.styles.halign = 'left'
+              d.cell.styles.halign = 'center'
             }
             else {
-              d.cell.styles.halign = 'right'
+              d.cell.styles.halign = 'center'
             }
           }
         },
@@ -224,12 +215,26 @@ export const DownloadReport: FC = () => {
     }, [jsPDF, autoTable, StreamClient]);
 
     return (
-        <div>
-            <button
-                onClick={onClick}
-            >
-                Download Report
-            </button>
-        </div>
+      <div className="max-w-xs my-2 overflow-hidden rounded shadow-lg">
+      <div className="px-6 py-4">
+        <div className="mb-2 text-xl font-bold">Please input the stream ID you wish to generate the report for</div>
+        <form className="flex flex-col" onSubmit={onClick}>
+          
+          <input
+            className="mb-4 border-b-2"
+            id="streamID"
+            name="streamID"
+            type="text"
+            required
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 font-bold text-white bg-blue-500 rounded-full hover:bg-blue-700"
+          >
+            Submit
+          </button>
+        </form>
+      </div>
+    </div>
     )
 };
