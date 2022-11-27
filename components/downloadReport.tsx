@@ -1,65 +1,53 @@
-import React, { FC, useCallback, useState } from "react";
+import React, { FC, useCallback } from "react";
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { Connection, PublicKey } from "@solana/web3.js";
 import {
-    StreamClient,
-    Stream,
-    CreateParams,
-    CreateMultiParams,
-    WithdrawParams,
-    TransferParams,
-    TopupParams,
-    CancelParams,
-    GetAllParams,
-    StreamDirection,
-    StreamType,
-    Cluster,
-    TxResponse,
-    CreateResponse,
-    BN,
-    getBN,
-    getNumberFromBN,
+  StreamClient,
+  Stream,
 } from "@streamflow/stream";
+import styles from '../styles/Home.module.css';
 
 
 export const DownloadReport: FC = () => {
 
-    const onClick = useCallback(async (e:any) => {
-      e.preventDefault();
+  const onClick = useCallback(async (e: any) => {
+    e.preventDefault();
 
-      const streamID = e.target.streamID.value;
-      const streamClient = new StreamClient("https://api.devnet.solana.com");
+    const streamID = e.target.streamID.value;
+    const streamClient = new StreamClient("https://api.devnet.solana.com"); //# CHANGE RPC ENDPOINT HERE
+    const tokenDecimals = 9; //################################################ CHANGE TOKEN DECIMALS HERE
 
-      async function getStreamData() {
-        var streamData = {} as Stream
-        try {
-          streamData = await streamClient.getOne(streamID);
-        } catch (e:any) {
-          throw e
-        }
-        return streamData
+    async function getStreamData() {
+      var streamData = {} as Stream
+      try {
+        streamData = await streamClient.getOne(streamID);
+      } catch (e: any) {
+        alert("Something went wrong, please check your input and try again")
       }
+      return streamData
+    }
 
-      const data = await getStreamData()
-      
+    const data = await getStreamData()
+
+    if (data.name) {
+
       const name = data.name.split("\u0000").join("");
       var status = '';
       const sender = data.sender;
       const recipient = data.recipient;
-      const currentTimestamp = Math.floor(Date.now()/1000);
-      const depositedAmount = data.depositedAmount / (10**9);
-      const unlockedAmount = data.unlocked(currentTimestamp, 0) / 10**9;
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const depositedAmount = data.depositedAmount / (10 ** tokenDecimals);
+      const unlockedAmount = data.unlocked(currentTimestamp, 0) / 10 ** tokenDecimals;
       const startTime = new Date(data.start * 1000).toLocaleString();
       const endTime = new Date(data.end * 1000).toLocaleString()
-      const streamflowFeeTotal = data.streamflowFeeTotal / 10**9;
+      const streamflowFeeTotal = data.streamflowFeeTotal / 10 ** tokenDecimals;
       const streamflowFeePercent = streamflowFeeTotal / depositedAmount * 100;
       const releaseRateSeconds = depositedAmount / (data.end - data.start);
       const releaseRateHours = releaseRateSeconds * 60 * 60;
       const releaseRateDays = releaseRateHours * 24;
       var transferableBy = '';
       var cancelableBy = '';
-      
+
       if (currentTimestamp - data.start <= 0) {
         status = 'Scheduled'
       }
@@ -74,7 +62,7 @@ export const DownloadReport: FC = () => {
       }
 
       if (data.transferableBySender && data.transferableByRecipient) {
-        transferableBy = 'Sender and Recipient'
+        transferableBy = 'Both Sender and Recipient'
       }
       else if (data.transferableBySender) {
         transferableBy = 'Only Sender'
@@ -87,7 +75,7 @@ export const DownloadReport: FC = () => {
       }
 
       if (data.cancelableBySender && data.cancelableByRecipient) {
-        cancelableBy = 'Sender and Recipient'
+        cancelableBy = 'Both Sender and Recipient'
       }
       else if (data.cancelableBySender) {
         cancelableBy = 'Only Sender'
@@ -98,52 +86,52 @@ export const DownloadReport: FC = () => {
       else {
         cancelableBy = 'Not Transferable'
       }
-      
 
       const doc = new jsPDF();
+      const documentName = 'Streamflow-Report-' + streamID;
+
       autoTable(doc, {
-          body: [
-            [
-                {
-                  content: 'StreamFlow Finance Stream Report',
-                  styles: {
-                    halign: 'center',
-                    fontSize: 20,
-                    //textColor: '#ffffff'
-                    fontStyle: 'bolditalic'
-                  }
-                },
-            ],
+        body: [
+          [
+            {
+              content: 'Streamflow Finance Stream Report',
+              styles: {
+                halign: 'center',
+                fontSize: 20,
+                fontStyle: 'bolditalic'
+              }
+            },
           ],
-          theme: 'plain',
-          
+        ],
+        theme: 'plain',
+
       });
 
       autoTable(doc, {
-        head:[
-            {
-              summary: 'Summary',
-              noting: '',
-            }
+        head: [
+          {
+            summary: 'Summary',
+            noting: '',
+          }
         ],
-        body:[
-            ['Subject', name],
-            ['Status', status],
-            ['Sender', sender],
-            ['Recipient', recipient],
-            ['Total locked amount', depositedAmount + ' [Token Units WIP]'],
-            ['Unlocked amount', unlockedAmount + ' [Token Units WIP]'],
-            ['Start time', startTime],
-            ['End time', endTime],
+        body: [
+          ['Subject', name],
+          ['Status', status],
+          ['Sender', sender],
+          ['Recipient', recipient],
+          ['Total locked amount', depositedAmount + ' [Token Units WIP]'],
+          ['Unlocked amount', unlockedAmount + ' [Token Units WIP]'],
+          ['Start time', startTime],
+          ['End time', endTime],
         ],
         theme: 'striped',
         styles: {
-            fillColor: '#ccddff',
+          fillColor: '#ccddff',
         },
         headStyles: {
-            fillColor: '#1a66ff',
-            fontSize: 18
-            
+          fillColor: '#1a66ff',
+          fontSize: 18
+
         },
         didParseCell: (d) => {
           if (d.section == 'body') {
@@ -158,25 +146,25 @@ export const DownloadReport: FC = () => {
       })
 
       autoTable(doc, {
-        head:[
-            ['Additional Information', ''],
+        head: [
+          ['Additional Information', ''],
         ],
-        body:[
-            ['Stream ID', streamID],
-            ['Release rate', 
-              releaseRateSeconds.toFixed(6) + ' token/second' + '\n' +
-              releaseRateHours.toFixed(6) + ' token/hour' + '\n' +
-              releaseRateDays.toFixed(6) + ' token/day'
-            ],
-            ['Transferable by', transferableBy],
-            ['Cancelable by', cancelableBy],
-            ['Streamflow fee percent', streamflowFeePercent + '%'],
-            ['Streamflow fee', streamflowFeeTotal+ ' [Token Units WIP]'],
+        body: [
+          ['Stream ID', streamID],
+          ['Release rate',
+            releaseRateSeconds.toFixed(6) + ' tokens/second' + '\n' +
+            releaseRateHours.toFixed(6) + ' tokens/hour' + '\n' +
+            releaseRateDays.toFixed(6) + ' tokens/day'
+          ],
+          ['Transferable by', transferableBy],
+          ['Cancelable by', cancelableBy],
+          ['Streamflow fee percent', streamflowFeePercent + '%'],
+          ['Streamflow fee', streamflowFeeTotal + ' [Token Units WIP]'],
         ],
         theme: 'striped',
         headStyles: {
-            fillColor: '#343a40',
-            fontSize: 18
+          fillColor: '#343a40',
+          fontSize: 18
         },
         didParseCell: (d) => {
           if (d.section == 'body') {
@@ -195,8 +183,8 @@ export const DownloadReport: FC = () => {
         body: [['WIP', 'WIP']],
         theme: 'striped',
         headStyles: {
-            fillColor: '#343a40',
-            fontSize: 18
+          fillColor: '#343a40',
+          fontSize: 18
         },
         didParseCell: (d) => {
           if (d.section == 'body') {
@@ -210,18 +198,18 @@ export const DownloadReport: FC = () => {
         },
       })
 
-        doc.save("test")
+      doc.save(documentName)
+    }
+  }, [jsPDF, autoTable, StreamClient]);
 
-    }, [jsPDF, autoTable, StreamClient]);
+  return (
+    <div className={styles.container}>
+      <div className={styles.main}>
+        <div className={styles.title}>Please input the stream ID you wish to generate the report for</div>
+        <form className={styles.card} onSubmit={onClick}>
 
-    return (
-      <div className="max-w-xs my-2 overflow-hidden rounded shadow-lg">
-      <div className="px-6 py-4">
-        <div className="mb-2 text-xl font-bold">Please input the stream ID you wish to generate the report for</div>
-        <form className="flex flex-col" onSubmit={onClick}>
-          
           <input
-            className="mb-4 border-b-2"
+            className={styles.input}
             id="streamID"
             name="streamID"
             type="text"
@@ -229,12 +217,12 @@ export const DownloadReport: FC = () => {
           />
           <button
             type="submit"
-            className="px-4 py-2 font-bold text-white bg-blue-500 rounded-full hover:bg-blue-700"
+            className={styles.button}
           >
-            Submit
+            Download Report
           </button>
         </form>
       </div>
     </div>
-    )
+  )
 };
