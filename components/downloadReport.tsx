@@ -14,8 +14,9 @@ export const DownloadReport: FC = () => {
     e.preventDefault();
 
     const streamID = e.target.streamID.value;
-    const streamClient = new StreamClient("https://api.devnet.solana.com"); //# CHANGE RPC ENDPOINT HERE
-    const tokenDecimals = 9; //################################################ CHANGE TOKEN DECIMALS HERE
+    const rpcEndpoint = "https://api.devnet.solana.com"//# CHANGE RPC ENDPOINT HERE
+    const tokenDecimals = 9; //########################### CHANGE TOKEN DECIMALS HERE
+    const streamClient = new StreamClient(rpcEndpoint);
 
     async function getStreamData() {
       var streamData = {} as Stream
